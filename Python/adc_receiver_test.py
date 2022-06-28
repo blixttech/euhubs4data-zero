@@ -51,6 +51,7 @@ class DataProtocol:
             self.channels = 0
             self.resolution = 0
             self.adcCount = 0
+            self.a_b_data = {}
             self.adc_data = {}
             self.timeStamp = time.time()
 
@@ -139,8 +140,25 @@ class DataProtocol:
         sample_block.channels = cbor_data[3]
         sample_block.resolution = cbor_data[4]
         bytes_per_sample = math.ceil(sample_block.resolution / 8)
-        sample_bytes = cbor_data[5]
 
+        sample_bytes = None
+        if (len(cbor_data) == 6):
+            sample_bytes = cbor_data[5]
+        if (len(cbor_data) == 7):
+            a_b_data_bytes = cbor_data[5]
+            if len(a_b_data_bytes) % 4:
+                logger.error("Invalid a and b values %d", len(a_b_data_bytes))
+                return None
+
+            for i in range(0, sample_block.channels):
+                a_val = int(a_b_data_bytes[i*4]) + int(a_b_data_bytes[(i*4)+1] << 8)
+                b_val = int(a_b_data_bytes[(i*4)+2]) + int(a_b_data_bytes[(i*4)+3] << 8)
+                sample_block.a_b_data[i] = (a_val, b_val)
+            sample_bytes = cbor_data[6]
+        if (sample_bytes == None):
+            logger.error("Invalid cbor data length")
+            return None
+        
         adc_data = {i: [] for i in range(0, sample_block.channels)}
         if len(sample_bytes) % bytes_per_sample:
             logger.error("Invalid samples: samples %d, bytes/sample %d",
@@ -187,7 +205,22 @@ class DataProtocol:
                 csv_writer.blockCounter += blockJump
             
             blockSize = sample_block.adcCount / sample_block.channels
-            
+
+            if (len(sample_block.a_b_data)==3):
+                lca = sample_block.a_b_data[0][0]
+                lcb = sample_block.a_b_data[0][1]
+                hca = sample_block.a_b_data[1][0]
+                hcb = sample_block.a_b_data[1][1]
+                va = sample_block.a_b_data[2][0]
+                vb = sample_block.a_b_data[2][1]
+            else:
+                lca = 1650
+                lcb = 32768
+                hca = 17187
+                hcb = 32768
+                va = 61
+                vb = 32768
+                
             row_row = []
             adcTime = sample_block.sample_interval
             sTime = adcTime * sample_block.channels / 1000000000.0
@@ -205,19 +238,13 @@ class DataProtocol:
                 for val in z:
                     if (i == 0):
                         #low gain current
-                        a = 1650
-                        b = 32768
-                        row.append(round((val - b) / a, 3))
+                        row.append(round((val - lcb) / lca, 3))
                     if (i == 1):
                         #high gain current
-                        a = 17187
-                        b = 32768
-                        row.append(round((val - b) / a, 3))
+                        row.append(round((val - hcb) / hca, 3))
                     if (i == 2):
                         #Voltage
-                        a = 61
-                        b = 32768
-                        row.append(round((val - b) / a, 3))
+                        row.append(round((val - vb) / va, 3))
                     i += 1
                 row_row.append(row)
             if (sample_block.timeStamp - blockSize*sTime > csv_writer.lastBlockTime):
