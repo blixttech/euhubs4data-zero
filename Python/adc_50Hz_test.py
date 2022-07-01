@@ -172,7 +172,7 @@ class DataProtocol:
                     voltage = round((val - vb) / va, 3)
                     if (voltage > 0 and verifier.lastVoltage <= 0):
                         samples = verifier.samplesSinceLastZero
-                        sampleInterval = round(samples / 0.02 / 3)
+                        sampleInterval = round(1/(samples / 0.02)/3 * 1000000000)
                         print('Counted samples at 50 Hz: ' + str(samples)
                               + ' Calculated interval ' + str(sampleInterval)
                               + ' Reported interval ' + str(sample_block.sample_interval)
