@@ -24,7 +24,7 @@ class zerounitthread:
             print('No thread started for ' + zero_info.remote_addr)
         
 def _zeroThread(zero_info):
-    print('in ' + zero_info.remote_addr)
+    #print('in ' + zero_info.remote_addr)
     zero_info.loop = asyncio.new_event_loop()
     asyncio.set_event_loop(zero_info.loop)
     zero_info.loop.run_until_complete(main_coro_t(zero_info))
@@ -33,6 +33,7 @@ def _zeroThread(zero_info):
 def _saveToCsv(zero_info):
     file = None #open("test", 'w', encoding='utf-8')
     fileStartTime = 0
+    lastBlockNr = 0
     while not zero_info.stop_thread:
         time.sleep(0.1)
         currentTime = time.time()
@@ -41,7 +42,7 @@ def _saveToCsv(zero_info):
             #Write to csv
             print('Writing ' + str(nrOfBlocks) + ' blocks to csv ' + zero_info.remote_addr)
             if file is None:
-                fileName = 'IP'+ zero_info.remote_addr + 'D'+datetime.now().strftime("%Y-%m-%dT%H-%M-%S.csv")
+                fileName = 'IP'+ zero_info.remote_addr + 'D'+datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
                 file = open(fileName,'w',encoding='utf-8')
                 fileStartTime = zero_info.sampleblocks[0].udphandletime
 
@@ -52,17 +53,26 @@ def _saveToCsv(zero_info):
                 bIndex += 1
                 sampleblock = zero_info.sampleblocks[bIndex]
                 handleTime = sampleblock.udphandletime
+                #if lastBlockNr > 0 and sampleblock.index > lastBlockNr + 1:
+                #    print('IP ' + zero_info.remote_addr + ' Missing ' + str(sampleblock.index - lastBlockNr) + ' blocks')
+                #if sampleblock.index <= lastBlockNr:
+                #    print('IP ' + zero_info.remote_addr + ' reversing block nr')
+                lastBlockNr = sampleblock.index
                 for z in sampleblock.samples:
                     #strr += str(z.timestamp) + ';' + str(z.blockNr) + ';'+ str(z.sampleNr) + ';'+ str(z.adcTime)+ ';'+ str(z.lgCurrent)+ ';'+ str(z.hgCurrent)+ ';'+ str(z.voltage) + '\n'
                     strr += str(z.timestamp) + ';' + str(z.lgCurrent)+ ';'+ str(z.hgCurrent)+ ';'+ str(z.voltage) + '\n'
             del zero_info.sampleblocks[0:bIndex + 1]
             file.write(strr)
+            file.flush()
         if file is not None and fileStartTime + zero_info.newfiletimeout < time.time():
             print('Closing file ')
             file.close()
+            os.rename(file.name, file.name + '.csv')
             file = None
     if file is not None:
         file.close()
+        os.rename(file.name, file.name + '.csv')
+        file = None
 
 
 async def main_coro_t(zero_info):

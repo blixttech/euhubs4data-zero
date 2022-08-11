@@ -53,6 +53,7 @@ class zerounit:
         self.synctime = True
         self.referencetime = time.time()
         self.started = False
+        self.lastIndex = 0
 
     def connection_made(self, transport):
         self.transport = transport
@@ -72,10 +73,14 @@ class zerounit:
                 self.synctime = False
                 tt = parseudpdata(data, 0)
                 self.referencetime = time.time() - tt.calcblocktime()
-                print('t ' + str(tt.samples[0].timestamp))
+                #print('t ' + str(tt.samples[0].timestamp))
             else:
                 bd = parseudpdata(data, self.referencetime)
-                
+                if self.lastIndex > 0 and bd.index > self.lastIndex + 1:
+                    print('IP ' + ipaddr + ' Missing ' + str(bd.index - self.lastIndex) + ' blocks (UDP package lost)')
+                if bd.index <= self.lastIndex:
+                    print('IP ' + ipaddr + ' block index reversed, previous ' + self.lastIndex + ' received ' + bd.index)
+                self.lastIndex = bd.index
                 
                 if len(self.info.sampleblocks) > 0 and self.info.sampleblocks[-1].calcblocktime() > bd.calcblocktime():
                     print('time error, resyncing ' + self.info.remote_addr)

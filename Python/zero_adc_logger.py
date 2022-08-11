@@ -32,7 +32,7 @@ if __name__ == "__main__":
     #TODO::Read ip-list from arguments
     urls = []
     urls.append('192.168.78.201')
-    urls.append('192.168.78.202')
+    #urls.append('192.168.78.202')
 
     zerounits = {}
     
@@ -40,7 +40,6 @@ if __name__ == "__main__":
         for url in urls:
             zero_info = zerounitinfo()
             zero_info.remote_addr = url
-            print('ra ' + zero_info.remote_addr)
             zerounits[url] = zerounitthread(zero_info)
 
         while True:
