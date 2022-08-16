@@ -10,6 +10,7 @@ import asyncio
 import cbor2
 import re
 import time
+import multiprocessing
 from datetime import datetime
 from utils.zerosampleblock import *
 
@@ -22,6 +23,7 @@ class zerounitinfo:
         self.csvwritetimeout = 1
         self.olddatatimeout = 10
         self.newfiletimeout = 10
+        self.queue = multiprocessing.Manager().Queue(1000)
 
     def getlocalport(self):
         lastipbyte = self.getlastipbyte()
@@ -89,8 +91,8 @@ class zerounit:
                     print('timestep ' + str(timestep))
                     #print('time 1 ' + str(self.info.sampleblocks[-1].udphandletime) + ' time 2 ' +str(self.info.sampleblocks[-1].calcblocktime()))
                 else:
-                    self.info.sampleblocks.append(bd)
-                
+                    #self.info.sampleblocks.append(bd)
+                    self.info.queue.put(bd)                
         else:
             print('wrong ip, received: ' + ipaddr + ' expected: ' + self.info.remote_addr)
 
@@ -106,7 +108,9 @@ class zerounit:
             self.loop.call_later(1, self._send_data_request)
         else:
             if self.info.stop_thread:
-                print('Requested stop: ' + self.info.remote_addr)
+                print('Requested stop UDP receive thread: ' + self.info.remote_addr)
+                self.info.queue.put(True)
+                time.sleep(0.1)
             else:
                 print('No valid IP to send request to, aborting... ' + self.info.remote_addr)
             self.loop.stop()
