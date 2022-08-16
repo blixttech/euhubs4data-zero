@@ -19,7 +19,6 @@ class zerounitinfo:
         self.remote_addr = ''
         self.stop_thread = False
         self.loop = None
-        self.sampleblocks = []
         self.csvwritetimeout = 1
         self.olddatatimeout = 10
         self.newfiletimeout = 10
@@ -56,45 +55,43 @@ class zerounit:
         self.referencetime = time.time()
         self.started = False
         self.lastIndex = 0
+        self.lastrectime = 0
 
     def connection_made(self, transport):
         self.transport = transport
         sock = transport.get_extra_info("socket")
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        bfs = sock.getsockopt(socket.SOL_SOCKET,socket.SO_RCVBUF)
+        print('bufz ' + str(bfs))
+        sock.setsockopt(socket.SOL_SOCKET,socket.SO_RCVBUF, bfs*2)
+        bfs = sock.getsockopt(socket.SOL_SOCKET,socket.SO_RCVBUF)
+        print('bufz ' + str(bfs))
         self._send_data_request()
 
     def datagram_received(self, data, addr):
         ipaddr = addr[0]
         if ipaddr == self.info.remote_addr:
-            #print('received data')
-            while len(self.info.sampleblocks) > 0 and self.info.sampleblocks[0].udphandletime < time.time() - self.info.olddatatimeout:
-                del self.info.sampleblocks[0]
-                print('Old unprocessed data left in receive buffer, removing oldest')
             if self.synctime:
                 self.synctime = False
                 tt = parseudpdata(data, 0)
                 self.referencetime = time.time() - tt.calcblocktime()
-                #print('t ' + str(tt.samples[0].timestamp))
             else:
                 bd = parseudpdata(data, self.referencetime)
                 if self.lastIndex > 0 and bd.index > self.lastIndex + 1:
-                    print('IP ' + ipaddr + ' Missing ' + str(bd.index - self.lastIndex) + ' blocks (UDP package lost)')
+                    print('IP ' + ipaddr + ' Missing ' + str(bd.index - self.lastIndex) + ' blocks (UDP package lost), time since last rec ' + str(time.time()-self.lastrectime) + ' ct ' + str(time.time()))
                 if bd.index <= self.lastIndex:
                     print('IP ' + ipaddr + ' block index reversed, previous ' + self.lastIndex + ' received ' + bd.index)
                 self.lastIndex = bd.index
                 
-                if len(self.info.sampleblocks) > 0 and self.info.sampleblocks[-1].calcblocktime() > bd.calcblocktime():
-                    print('time error, resyncing ' + self.info.remote_addr)
-                    self.synctime = True
-                    timestep = self.info.sampleblocks[-1].udphandletime - self.referencetime
-                    print('timestep ' + str(timestep))
-                    #print('time 1 ' + str(self.info.sampleblocks[-1].udphandletime) + ' time 2 ' +str(self.info.sampleblocks[-1].calcblocktime()))
-                else:
-                    #self.info.sampleblocks.append(bd)
-                    self.info.queue.put(bd)                
+                #TODO::Add sanity check for the calculated timestamp, it should not be allowed to reverse, if so it should resync
+                self.info.queue.put(bd)                
         else:
             print('wrong ip, received: ' + ipaddr + ' expected: ' + self.info.remote_addr)
+        tt = time.time() - self.lastrectime
+        if tt > 0.01:
+            print('Slow rec ' + str(tt))
+        self.lastrectime = time.time()
 
     def connection_lost(self, exc):
         pass
