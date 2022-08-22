@@ -69,9 +69,12 @@ def _saveToCsv(queue, remote_addr):
                 sampleblocks.clear()
                 try:
                     if file is None:
-                        fileName = 'IP' + remote_addr + 'D' + startTimeStr + 'P' + str(fileIndex)
+                        fileName = 'IP' + remote_addr + 'D' + startTimeStr + 'P' + f'{fileIndex:06d}'
                         file = open(fileName,'w',encoding='utf-8')
                         fileIndex += 1
+                        if fileIndex > 999999:
+                            fileIndex = 1
+                            startTimeStr = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
                     if file is not None:
                         file.write(strr)
                         file.flush()
